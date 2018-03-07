@@ -1,0 +1,7 @@
+#=========================================================
+#                 Required Python Modules
+#=========================================================
+#--- Scientific Modules ---
+numpy         == 1.14.0   # Requires: N/A
+#--- Computer Vision ---
+opencv-python == 3.3.0.10 # Requires: numpy
