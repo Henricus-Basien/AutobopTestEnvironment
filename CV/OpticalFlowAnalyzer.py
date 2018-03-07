@@ -255,7 +255,8 @@ if __name__=="__main__":
         #--- Camera Settings ---
         Source = 0 # Camera #0
         Resolution = [1280,720]
-        FPS = 60
+        
+    Max_FPS = 60
 
     Title+=" - Source: "+str(Source)
 
@@ -273,9 +274,13 @@ if __name__=="__main__":
     OFA = OpticalFlowAnalyzer()
 
     Camera = cv2.VideoCapture(Source)
-    Camera.set(3,Resolution[0])
-    Camera.set(4,Resolution[1])
-    Wait(1.0) # Needed for Camera Initialization
+    try:
+        CameraNr = int(Source)
+        Camera.set(3,Resolution[0])
+        Camera.set(4,Resolution[1])
+        Wait(1.0) # Needed for Camera Initialization
+    except:
+        pass # VideoFile is used!
 
     ret,frame_old = Camera.read()
 
@@ -337,7 +342,7 @@ if __name__=="__main__":
         # WaitKey & Break on ESC
         #-------------------------------------------
         
-        k = cv2.waitKey(1000/FPS)#(33)
+        k = cv2.waitKey(1000/Max_FPS)#(33)
         if k==27:    # Esc key to stop
             print("ESC pressed, Test will be Terminated!")
             break
