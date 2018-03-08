@@ -77,7 +77,7 @@ PrintSubHeader "Installing Kivy"
 ConfirmQ="Do you want to (re-)install Kivy [Y/n]?"
 result=$(Confirm "$ConfirmQ")
 if $result; then
-	Run "sudo apt-add repository ppa:kivy-team/kivy"
+	Run "sudo add-apt-repository ppa:kivy-team/kivy"
 	Run "sudo apt-get update"
 	Run "$aptInstall_Y python-kivy --upgrade"
 	Run "$aptInstall_Y -f"
