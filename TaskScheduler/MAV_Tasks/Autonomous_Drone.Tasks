@@ -7,6 +7,10 @@ from TaskTypes import *
 #********************************************************************************************************************************************************************************************************
 Tasks = Development_Task(Name="Autonomous Drone",Workload="1.2M",PriorityLevel=3,StartDate="02.03.2018",DateCreated="02.03.2018",DateChanged="08.03.2018",Contributors=Team.Contributors,Team=Team,Description="Development of an Autonomous Drone (Parrrot Bebop 2), to avoid obstacles in the CyberZoo")
 Autonomous_Drone_Tasks = Tasks
-Tasks.AddSubTask(Software_Task(Name="Autopilot"         ,Workload="2.0d",PriorityLevel=3,Progress=0.0 ,DateCreated="02.03.2018",DateChanged="02.03.2018",Description="The internal fireware that ensures that the autopilot is operating as intended!"))
+Tasks.AddSubTask(Software_Task(Name="Autopilot"         ,Workload="2.0d",PriorityLevel=3              ,DateCreated="02.03.2018",DateChanged="02.03.2018",Description="The internal fireware that ensures that the autopilot is operating as intended!"))
 Tasks.AddSubTask(Software_Task(Name="Obstacle Detection",Workload="4.0d",PriorityLevel=4,Progress=0.0 ,DateCreated="02.03.2018",DateChanged="02.03.2018",Description="CV algorithm that detects (and localises) obstacles that could harm the Drone."))
 Tasks.AddSubTask(Software_Task(Name="Obstacle Avoidance",Workload="4.0d",PriorityLevel=4,Progress=0.0 ,DateCreated="02.03.2018",DateChanged="02.03.2018",Description="Evasive maneuvers that based on the knowledge of the position of the obstacles evades them (Limited Virtual Potential Field)"))
+#======================================================================================================================================================
+# Autopilot
+#======================================================================================================================================================
+Tasks["Autopilot"].AddSubTask(Software_Task(Name="Angle conventions",Workload="1.0h",PriorityLevel=3,Progress=0.0 ,DateCreated="08.03.2018",DateChanged="08.03.2018",Contributors=["Casper"],Description="Graphical overview of relevant angles"))
