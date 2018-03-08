@@ -53,7 +53,12 @@ if $result; then
 	Run "cd ~"
 	Run "git clone https://github.com/Itseez/opencv.git"
 	Run "cd opencv"
-	Run "git checkout 3.0.0"
+	Run "git checkout 3.4.1"
+
+	Run "cd ~"
+	Run "git clone https://github.com/Itseez/opencv_contrib.git"
+	Run "cd opencv_contrib"
+	Run "git checkout 3.4.1"
 
 	Run "cd ~/opencv"
 	Run "mkdir build"
@@ -64,7 +69,7 @@ if $result; then
 		-D INSTALL_PYTHON_EXAMPLES=ON \
 		-D OPENCV_EXTRA_MODULES_PATH=~/opencv_contrib/modules \
 		-D BUILD_EXAMPLES=ON ..
-
+	Run "make clean"
 	Run "make -j4"
 
 	Run "sudo make install"
