@@ -10,5 +10,5 @@ numpy                       == 1.14.0    # Requires: N/A   #! Numpy Version shou
 #                Interface & Visualization
 #=========================================================
 #--- UI ---
-kivy                        >= 1.10.0    # Requires: docutils, Kivy-Garden, pygments
+#kivy                        >= 1.10.0    # Requires: docutils, Kivy-Garden, pygments
 colorama                    >= 0.3.9     # Requires: N/A
