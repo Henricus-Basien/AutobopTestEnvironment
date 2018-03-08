@@ -288,6 +288,8 @@ if __name__=="__main__":
     # Run Analysis
     #+++++++++++++++++++++++++++++++++++++++++++
     
+    print Title
+
     t0 = getTime()
     t  = getTime()
     FrameCounter = 0
