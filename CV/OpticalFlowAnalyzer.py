@@ -67,7 +67,7 @@ except:
 #****************************************************************************************
 
 OpenCV_Version = int(cv2.__version__[0])
-print "OpenCV_Version",OpenCV_Version
+#print "OpenCV_Version",OpenCV_Version
 
 class OpticalFlowAnalyzer():
 
@@ -93,7 +93,7 @@ class OpticalFlowAnalyzer():
     # Optical Flow #1
     #+++++++++++++++++++++++++++++++++++++++++++
     
-    def ShowOpticalFlow1(self,frame_new,frame_old,Mode=1):
+    def ShowOpticalFlow1(self,frame_new,frame_old,Mode=1,InvertColor=True):
 
         #--- Convert Colorspace ---
         frame_new_g = cv2.cvtColor(frame_new,cv2.COLOR_BGR2GRAY)
@@ -123,11 +123,11 @@ class OpticalFlowAnalyzer():
                 Color = None
             else:
                 Color = "Mag"
-            frame = self.DrawArrows(frame_new,frame_new_g.shape,mag,ang,Color=Color)
+            frame = self.DrawArrows(frame_new,frame_new_g.shape,mag,ang,Color=Color,InvertColor=InvertColor)
 
         return frame
 
-    def DrawArrows(self,frame,res,mag,ang,Color=None,thickness = 2):#4):# BGR!
+    def DrawArrows(self,frame,res,mag,ang,Color=None,thickness = 2,InvertColor=True):#4):# BGR!
 
         #-------------------------------------------
         # Skip (make grid)
@@ -181,7 +181,10 @@ class OpticalFlowAnalyzer():
                     Val = mag[y,x]
                     Max = np.max(mag)
                     color = GradientColor(Val,colors=[Colors["Green"],Colors["Red"]],Min=0.,Max=Max)
-                    color = tuple((np.array(color)*255).astype(int)[::-1])
+                    color = (np.array(color)*255).astype(int)
+                    if InvertColor:
+                        color = color[::-1]
+                    color = tuple(color)
                     # print color,Val,Max
 
                 if 1:#OpenCV_Version>=3:
