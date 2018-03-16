@@ -66,6 +66,9 @@ except:
 # Optical Flow Analyzer
 #****************************************************************************************
 
+OpenCV_Version = int(cv2.__version__[0])
+print "OpenCV_Version",OpenCV_Version
+
 class OpticalFlowAnalyzer():
 
     def __init__(self):
@@ -97,7 +100,12 @@ class OpticalFlowAnalyzer():
         frame_old_g = cv2.cvtColor(frame_old,cv2.COLOR_BGR2GRAY)
 
         #--- Get Flow ---
-        flow = cv2.calcOpticalFlowFarneback(frame_old_g,frame_new_g, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+        if OpenCV_Version>=3:
+            flow = cv2.calcOpticalFlowFarneback(frame_old_g,frame_new_g, None, 0.5,3,15,3,5,1.2,0)
+        else:
+            flow = cv2.calcOpticalFlowFarneback(frame_old_g,frame_new_g,0.5,3,15,3,5,1.2,0)
+            #flow*=10**6
+        #print "flow",flow
         mag, ang = cv2.cartToPolar(flow[...,0], flow[...,1])
         
         #--- Display as HSV ---
@@ -176,7 +184,11 @@ class OpticalFlowAnalyzer():
                     color = tuple((np.array(color)*255).astype(int)[::-1])
                     # print color,Val,Max
 
-                cv2.arrowedLine(frame, tuple(pt1), tuple(pt2), color, thickness)
+                if 1:#OpenCV_Version>=3:
+                    cv2.arrowedLine(frame, tuple(pt1), tuple(pt2), color, thickness)
+                else:
+                    cv2.line(frame, tuple(pt1), tuple(pt2), color, thickness)
+                #print "Drawing Arrow",pt1,pt2
                 # print frame
         # print frame
         # print frame.shape
@@ -313,6 +325,8 @@ if __name__=="__main__":
         #-------------------------------------------
         
         ret,frame_new = Camera.read()
+
+        #print frame_new,type(frame_new),frame_new.shape
 
         #--- Check End of File ---
         if frame_new is None:
