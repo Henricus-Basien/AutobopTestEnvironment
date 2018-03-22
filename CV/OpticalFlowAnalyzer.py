@@ -15,6 +15,8 @@ Email: Henricus@Basien.de
 # External
 #+++++++++++++++++++++++++++++++++++++++++++
 
+from copy import copy
+
 #--- Mathematics ---
 import numpy as np
 
@@ -93,32 +95,109 @@ class OpticalFlowAnalyzer():
     # Optical Flow #1
     #+++++++++++++++++++++++++++++++++++++++++++
     
-    def ShowOpticalFlow1(self,frame_new,frame_old,Mode=1,InvertColor=True):
+    def GetOpticalFlow1(self,frame_new,frame_old,Raw=False,FlowManipulationFunction=None):
+
+        #+++++++++++++++++++++++++++++++++++++++++++
+        # Settings
+        #+++++++++++++++++++++++++++++++++++++++++++
+        
+        if 0:#hasattr(self,"flow"):
+            flow_init = self.flow
+            flags = cv2.OPTFLOW_USE_INITIAL_FLOW#0
+        else:
+            flow_init = None
+            flags     = 0
+
+        if 1:#0:
+            pyr_scale  = 0.5
+            levels     = 3
+            winsize    = 15
+            iterations = 3
+            poly_n     = 5
+            poly_sigma = 1.2
+        else:
+            pyr_scale  = 0.5
+            levels     = 2
+            winsize    = 15
+            iterations = 2
+            poly_n     = 5
+            poly_sigma = 1.2
+
+        
+
+        #+++++++++++++++++++++++++++++++++++++++++++
+
+        #--- Get Flow ---
+        if OpenCV_Version>=3:
+            flow = cv2.calcOpticalFlowFarneback(frame_old,frame_new,flow_init,pyr_scale,levels,winsize,iterations,poly_n,poly_sigma,flags)
+        else:
+            flow = cv2.calcOpticalFlowFarneback(frame_old,frame_new,pyr_scale,levels,winsize,iterations,poly_n,poly_sigma,flags,flow_init) #0.5,3,15,3,5,1.2,0)
+            #flow*=10**6
+
+        self.flow = copy(flow)
+
+        if FlowManipulationFunction is not None:
+            flow = FlowManipulationFunction(flow)
+
+        if Raw:
+            return flow
+        else:
+            return self.GetMagAng(flow)
+
+    def GetMagAng(self,flow):
+        mag, ang = cv2.cartToPolar(flow[...,0], flow[...,1])
+        return mag, ang
+
+    def PreprocessFrames(self,frame_new,frame_old):
+
+        #--- Change Size ---
+        if 0:#1:
+            res_new = (320/4,240/4)#(320/2,240/2)#(240,320)
+            frame_new = cv2.resize(frame_new, res_new)
+            frame_old = cv2.resize(frame_old, res_new)
 
         #--- Convert Colorspace ---
         frame_new_g = cv2.cvtColor(frame_new,cv2.COLOR_BGR2GRAY)
         frame_old_g = cv2.cvtColor(frame_old,cv2.COLOR_BGR2GRAY)
 
+        return frame_new_g,frame_old_g
+
+    def SubstractRotation(self,flow,rps=np.zeros(3),Invert=True):
+
+        for i in range(2):
+            #--- Dir ---
+            Dir = i
+            if Invert:
+                Dir = (Dir+1)%2
+            #--- Sign ---
+            Sign = -1#1
+            if Dir==1:
+                Sign*=-1
+            #--- Augment Flow ---
+            Scale = 1 # Should be function of viewangle and image resolution!!!
+            flow[:,:,Dir]+=int(rps[i]*Scale*Sign)
+        #flow-=20
+        #ang+=90
+
+        self.flow_corrected = copy(flow)
+
+        return flow
+
+    def ShowOpticalFlow1(self,frame_new,frame_old,Mode=1,InvertColor=True,FlowManipulationFunction=None):
+
+        #from functools import partial
+        #FlowManipulationFunction = partial(self.SubstractRotation,rps=[10,10,10])
+
+        #--- Preprocess Frames ---
+        frame_new_g,frame_old_g = self.PreprocessFrames(frame_new,frame_old)
+
         #--- Get Flow ---
-        if OpenCV_Version>=3:
-            flow = cv2.calcOpticalFlowFarneback(frame_old_g,frame_new_g, None, 0.5,3,15,3,5,1.2,0)
-        else:
-            flow = cv2.calcOpticalFlowFarneback(frame_old_g,frame_new_g,0.5,3,15,3,5,1.2,0)
-            #flow*=10**6
-        #print "flow",flow
-        mag, ang = cv2.cartToPolar(flow[...,0], flow[...,1])
-        
+        mag,ang = self.GetOpticalFlow1(frame_new_g,frame_old_g,FlowManipulationFunction=FlowManipulationFunction)
+
         #--- Display as HSV ---
         if Mode==1:
-            hsv = np.zeros_like(frame_old)
-            hsv[...,0] = ang*180/np.pi/2
-            hsv[...,1] = 255
-            hsv[...,2] = cv2.normalize(mag,None,0,255,cv2.NORM_MINMAX)
-            bgr = cv2.cvtColor(hsv,cv2.COLOR_HSV2BGR)
-
-            frame = bgr
+            frame = self.DrawHSV_Flowmap(frame_old,mag,ang)
         else:
-            
             if Mode==2:
                 Color = None
             else:
@@ -127,7 +206,18 @@ class OpticalFlowAnalyzer():
 
         return frame
 
-    def DrawArrows(self,frame,res,mag,ang,Color=None,thickness = 2,InvertColor=True):#4):# BGR!
+    def DrawHSV_Flowmap(frame,mag,ang):
+
+        hsv = np.zeros_like(frame)
+        hsv[...,0] = ang*180/np.pi/2
+        hsv[...,1] = 255
+        hsv[...,2] = cv2.normalize(mag,None,0,255,cv2.NORM_MINMAX)
+        bgr = cv2.cvtColor(hsv,cv2.COLOR_HSV2BGR)
+
+        return bgr
+        #frame = bgr
+
+    def DrawArrows(self,frame,res,mag,ang,Color=None,thickness = 1,InvertColor=True):#4):# BGR!
 
         #-------------------------------------------
         # Skip (make grid)
@@ -187,10 +277,31 @@ class OpticalFlowAnalyzer():
                     color = tuple(color)
                     # print color,Val,Max
 
-                if 1:#OpenCV_Version>=3:
-                    cv2.arrowedLine(frame, tuple(pt1), tuple(pt2), color, thickness)
+                #--- Check Arrow ---
+
+                pt1 = tuple(np.array(pt1).astype(int))
+                pt2 = tuple(np.array(pt2).astype(int))
+
+                ArrowsValid = True
+                for pt in [pt1,pt2]:
+                    for i in range(2):
+                        if 0>pt[i]or pt[i]>frame.shape[(i+1)%2]:
+                            ArrowsValid = False
+                            break
+                    if not ArrowsValid:
+                        break
+
+                if ArrowsValid:
+                    #print "Points '"+str(pt1)+"' & '"+str(pt2)+"' are valid!"
+                    if 1:#OpenCV_Version>=3:
+                        cv2.arrowedLine(frame, pt1, pt2, color, thickness)
+                    else:
+                        cv2.line(frame, pt1, pt2, color, thickness)
                 else:
-                    cv2.line(frame, tuple(pt1), tuple(pt2), color, thickness)
+                    color = (255,0,0)#(0,0,255)
+                    cv2.circle(frame,pt1, thickness, color, -1)
+                    #print "Points '"+str(pt1)+"' & '"+str(pt2)+"' are invalid!"
+                    pass
                 #print "Drawing Arrow",pt1,pt2
                 # print frame
         # print frame

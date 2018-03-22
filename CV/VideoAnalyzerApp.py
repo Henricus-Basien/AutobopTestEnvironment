@@ -22,6 +22,8 @@ Description:
 import time
 from time import time as getTime
 
+from functools import partial
+
 #-------------------------------------------
 # Mathematics
 #-------------------------------------------
@@ -118,6 +120,8 @@ class CustomCameraOpenCV_Analyzer(CustomCameraOpenCV,FloatLayout):
         self.Labels["Accelerometer"] = Label(text="Accelerometer Data",pos_hint={'x':0,'y':0.05},size_hint=[1.0,0.05])
 
         self.Labels["Time"] = Label(text="Time Data",pos_hint={'x':0,'top':1.0}  ,size_hint=[1.0,0.05])
+        
+        self.Labels["Flow"] = Label(text="Flow Data",pos_hint={'x':0,'top':0.85} ,size_hint=[1.0,0.05])
 
         for label in self.Labels.values():
             self.add_widget(label)
@@ -128,6 +132,8 @@ class CustomCameraOpenCV_Analyzer(CustomCameraOpenCV,FloatLayout):
         
         self.t0 = getTime()
         self.t  = getTime()
+
+        self.dt_analysis = getTime()
 
     def AnalyzeFrame(self,frame):
 
@@ -140,7 +146,13 @@ class CustomCameraOpenCV_Analyzer(CustomCameraOpenCV,FloatLayout):
             freq = 0
 
         DT = self.t-self.t0
-        self.Labels["Time"].text = "T: "+str(round(DT,1))+" s"+" | "+str(round(freq,1))+" Hz"
+
+        TimeLabelText = "T: "+str(round(DT,1))+" s"+" | "+str(round(freq,1))+" Hz"
+        if self.dt_analysis!=0:
+            TimeLabelText+="\n"+"AnalysisTime: "+str(round(self.dt_analysis*1000,1))+"ms"
+            TimeLabelText+="|"+str(round(1./self.dt_analysis,1))+"Hz"
+
+        self.Labels["Time"].text = TimeLabelText
 
         #+++++++++++++++++++++++++++++++++++++++++++
         # Get Sensor Data
@@ -148,28 +160,101 @@ class CustomCameraOpenCV_Analyzer(CustomCameraOpenCV,FloatLayout):
         
         if UseAccelerometer:
             #print "Reading Accelerometer"
-            acc = accelerometer.acceleration
+            self.acc = accelerometer.acceleration
+            acc_Total = np.sum(np.array(self.acc)**2)**0.5
             #print "acc: ",acc
-            self.Labels["Accelerometer"].text = "Accleration: "+str(np.round(acc,3))
+            self.Labels["Accelerometer"].text = "Acceleration: "+str(np.round(self.acc,3))
+            self.Labels["Accelerometer"].text+= "\n"#" "
+            self.Labels["Accelerometer"].text+= "(Total: "+str(round(acc_Total,3))+")"
+            self.Labels["Accelerometer"].text+= " [m/s²]"
 
         if UseGyroscope:
             #print "Reading Gyroscope" 
-            rps = gyroscope.get_orientation()#rotation
+            self.rps = np.degrees(gyroscope.get_orientation())#rotation
+            rps_Total = np.sum(np.array(self.rps)**2)**0.5
             #print "rps: ",rps
-            self.Labels["Gyroscope"].text = "Rotational Velocity: "+str(np.round(rps,3))
+            self.Labels["Gyroscope"].text = "Rotational Velocity: "+str(np.round(self.rps,3))
+            self.Labels["Gyroscope"].text+= "\n"#" "
+            self.Labels["Gyroscope"].text+= "(Total: "+str(round(rps_Total,3))+")"
+            self.Labels["Gyroscope"].text+= " [deg/s]"
 
         #+++++++++++++++++++++++++++++++++++++++++++
         # Show Optical Flow
         #+++++++++++++++++++++++++++++++++++++++++++
         
+        if 1:
+            res_new = (150,200) #(240*2,320 *2)#(320,240)#(120,160)#(160,120) # (320,240)
+            #print frame.shape
+            frame = cv2.resize(frame, res_new)#(100, 50)) 
+            #print "After",frame.shape
+
         if hasattr(self,"OpticalFlowAnalyzer"):
             if hasattr(self,"frame_old"):
                 frame_new = frame
                 Mode = 3#2
-                frame = self.OpticalFlowAnalyzer.ShowOpticalFlow1(frame_new,self.frame_old,Mode=Mode,InvertColor=False)
+                #FlowManipulationFunction = self.FlowManipulationFunction
+                FlowManipulationFunction = partial(self.OpticalFlowAnalyzer.SubstractRotation,rps=self.rps)
+                frame = self.OpticalFlowAnalyzer.ShowOpticalFlow1(frame_new,self.frame_old,Mode=Mode,InvertColor=False,FlowManipulationFunction=FlowManipulationFunction)
                 self.frame_old = frame_new
             else:
                 self.frame_old = frame
+
+            #-------------------------------------------
+            # Get Flow Data
+            #-------------------------------------------
+
+            if hasattr(self.OpticalFlowAnalyzer,"flow"):
+                self.Labels["Flow"].text = "Flow Data: "
+
+                flows  = [self.OpticalFlowAnalyzer.flow,self.OpticalFlowAnalyzer.flow_corrected]
+                flows.append(flows[1]-flows[0])
+                titles = ["Original","Corrected","Dif"]
+                for i in range(len(flows)):
+                    flow  = flows[i]
+                    title = titles[i]
+
+                    flow_mag = np.linalg.norm(flow,axis=2)
+                    Mean = np.mean(flow_mag)
+                    Min  = np.min(flow_mag)
+                    Max  = np.max(flow_mag)
+                    self.Labels["Flow"].text+="\n"+title+": "
+                    self.Labels["Flow"].text+= "Mean="+str(round(Mean,2))
+                    self.Labels["Flow"].text+= ","+"Min=" +str(round(Min ,2))
+                    self.Labels["Flow"].text+= ","+"Max=" +str(round(Max ,2))
+
+                #-------------------------------------------
+                # Get Outliers
+                #-------------------------------------------
+            
+                if 1:
+                    flow_outliers = self.OpticalFlowAnalyzer.flow_corrected
+
+                    #--- Substract Mean ---
+                    for i in range(2):
+                        Mean = np.mean(flow_outliers[:,:,i])
+                        flow_outliers[:,:,i]-=Mean
+
+                    #--- Get Total ---
+                    flow_mag = np.linalg.norm(flow_outliers,axis=2)
+
+                    #--- Show Outliers ---
+                    step=5
+                    threshold = 10
+                    for i in range(0,flow_mag.shape[0],step):
+                        #if i%step!=0:
+                        #    continue
+                        for j in range(0,flow_mag.shape[1],step):
+                            #if j%step!=0:
+                            #    continue
+                            radius = 1
+                            pt = (j,i)
+                            
+                            #print "flow_mag[i,j]",flow_mag[i,j]
+                            if abs(flow_mag[i,j])>threshold:#1:
+                                cv2.circle(frame,pt,radius,(0,120,0),-1)
+
+        self.dt_analysis = getTime()-self.t
+
         return frame
 
 #****************************************************************************************
