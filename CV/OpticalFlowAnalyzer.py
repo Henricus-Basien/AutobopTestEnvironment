@@ -183,7 +183,7 @@ class OpticalFlowAnalyzer():
 
         return flow
 
-    def ShowOpticalFlow1(self,frame_new,frame_old,Mode=1,InvertColor=True,FlowManipulationFunction=None):
+    def ShowOpticalFlow1(self,frame_new,frame_old,Mode=1,InvertColor=True,FlowManipulationFunction=None,ShowResult=True):
 
         #from functools import partial
         #FlowManipulationFunction = partial(self.SubstractRotation,rps=[10,10,10])
@@ -195,16 +195,19 @@ class OpticalFlowAnalyzer():
         mag,ang = self.GetOpticalFlow1(frame_new_g,frame_old_g,FlowManipulationFunction=FlowManipulationFunction)
 
         #--- Display as HSV ---
-        if Mode==1:
-            frame = self.DrawHSV_Flowmap(frame_old,mag,ang)
-        else:
-            if Mode==2:
-                Color = None
+        if ShowResult:
+            if Mode==1:
+                frame = self.DrawHSV_Flowmap(frame_old,mag,ang)
             else:
-                Color = "Mag"
-            frame = self.DrawArrows(frame_new,frame_new_g.shape,mag,ang,Color=Color,InvertColor=InvertColor)
+                if Mode==2:
+                    Color = None
+                else:
+                    Color = "Mag"
+                frame = self.DrawArrows(frame_new,frame_new_g.shape,mag,ang,Color=Color,InvertColor=InvertColor)
 
-        return frame
+            return frame
+        else:
+            return frame_new
 
     def DrawHSV_Flowmap(frame,mag,ang):
 
