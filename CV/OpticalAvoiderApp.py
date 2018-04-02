@@ -24,6 +24,8 @@ from functools import partial
 
 from copy import copy
 
+from collections import OrderedDict
+
 #-------------------------------------------
 # Mathematics
 #-------------------------------------------
@@ -41,6 +43,7 @@ from kivy.uix.floatlayout import FloatLayout
 
 from kivy.uix.button import Button
 from kivy.uix.label import Label
+#from kivy.uix.slider import Slider
 
 #-------------------------------------------
 # Computer Vision
@@ -52,7 +55,7 @@ import cv2
 # Android
 #-------------------------------------------
 print "Importing Plyer"
-UseAccelerometer = True
+UseAccelerometer = False#True
 if UseAccelerometer:
     from plyer import accelerometer
 
@@ -61,12 +64,16 @@ if UseGyroscope:
     from plyer import gyroscope
 print "Done importing Plyer"
 
+#from plyer import orientation
+
 #+++++++++++++++++++++++++++++++++++++++++++
 # Internal
 #+++++++++++++++++++++++++++++++++++++++++++
 
 from AndroidCamera import CustomCameraOpenCV
 from OpticalAvoider import OpticalAvoider
+
+from LabeledSwitch import LabeledSwitch,LabeledSlider
 
 ProfilerPath = os.path.join(os.path.split(__file__)[0],"Profiler")
 sys.path.insert(0,ProfilerPath)
@@ -107,6 +114,27 @@ class AndroidOpenCV_OpticalAvoider(CustomCameraOpenCV,FloatLayout):
         # Sensor Data
         #-------------------------------------------
         
+        self.InitializeSensors()
+
+        #+++++++++++++++++++++++++++++++++++++++++++
+        # Labels
+        #+++++++++++++++++++++++++++++++++++++++++++
+        
+        self.InitializeLabels()
+
+        #+++++++++++++++++++++++++++++++++++++++++++
+        # Controls
+        #+++++++++++++++++++++++++++++++++++++++++++
+        
+        self.InitializeControls()
+
+        #+++++++++++++++++++++++++++++++++++++++++++
+        # Time keeping
+        #+++++++++++++++++++++++++++++++++++++++++++
+        
+        self.InitializeTimeKeeping()
+
+    def InitializeSensors(self):
         print "Intializing Sensors"
         #--- Accelerometer Data ---
         if UseAccelerometer:
@@ -122,10 +150,7 @@ class AndroidOpenCV_OpticalAvoider(CustomCameraOpenCV,FloatLayout):
             gyroscope.enable()
             print "Gyroscope Enabled"
 
-        #+++++++++++++++++++++++++++++++++++++++++++
-        # Labels
-        #+++++++++++++++++++++++++++++++++++++++++++
-        
+    def InitializeLabels(self):
         self.Labels = dict()
         self.Labels["Gyroscope"]     = Label(text="Gyroscope Data"    ,pos_hint={'x':0,'y':0}  ,size_hint=[1.0,0.05])
         self.Labels["Accelerometer"] = Label(text="Accelerometer Data",pos_hint={'x':0,'y':0.05},size_hint=[1.0,0.05])
@@ -134,13 +159,57 @@ class AndroidOpenCV_OpticalAvoider(CustomCameraOpenCV,FloatLayout):
         
         self.Labels["Flow"] = Label(text="Flow Data",pos_hint={'x':0,'top':0.85} ,size_hint=[1.0,0.05])
 
+        self.Labels["Control"] = Label(text="Control Info",pos_hint={'x':0,'top':0.925} ,size_hint=[1.0,0.05])
+
         for label in self.Labels.values():
             self.add_widget(label)
 
-        #+++++++++++++++++++++++++++++++++++++++++++
-        # Time keeping
-        #+++++++++++++++++++++++++++++++++++++++++++
-        
+    def InitializeControls(self):
+
+        self.InitializeBooleanControl()
+        self.InitializeVariableControl()
+
+    def InitializeBooleanControl(self):
+        size_hint = [0.5,0.3]#[0.4,0.15]
+        self.BooleanControlLayout = BoxLayout(pos_hint={'right':1.0,'center_y':0.5},size_hint=size_hint,orientation="vertical")
+
+        self.BooleanControls = OrderedDict()
+        for Setting in self.OpticalAvoider.BooleanSettings.keys():
+            self.BooleanControls[Setting] = LabeledSwitch(text=Setting ,active = self.OpticalAvoider.BooleanSettings[Setting])
+            self.BooleanControls[Setting].bindSwitch(active=partial(self.SetBooleanSetting_Callback,Setting=Setting))
+
+        for widget in self.BooleanControls.values():
+            self.BooleanControlLayout.add_widget(widget)
+
+        self.add_widget(self.BooleanControlLayout)
+
+    def InitializeVariableControl(self):
+        size_hint = [1.0,0.1]
+        self.VariableControlLayout = BoxLayout(pos_hint={'center_x':0.5,'y':0.1},size_hint=size_hint,orientation="vertical")
+
+        self.VariableControls = OrderedDict()
+        for Setting in self.OpticalAvoider.VariableSettings.keys():
+            Val,Min,Max = self.OpticalAvoider.VariableSettings[Setting]
+            self.VariableControls[Setting] = LabeledSlider(text=Setting,value=Val,min=Min,max=Max)
+            self.VariableControls[Setting].bindSlider(value=partial(self.SetVariableSetting_Callback,Setting=Setting))
+
+        for widget in self.VariableControls.values():
+            self.VariableControlLayout.add_widget(widget)
+
+        self.add_widget(self.VariableControlLayout)
+
+    def SetBooleanSetting_Callback(self,instance, value,Setting=None):
+
+        #Setting = instance.Label.text
+        self.OpticalAvoider.BooleanSettings[Setting] = value
+
+    def SetVariableSetting_Callback(self,instance, value,Setting=None):
+
+        #print instance,value,Setting
+
+        self.OpticalAvoider.VariableSettings[Setting][0] = value
+
+    def InitializeTimeKeeping(self):
         self.t0 = getTime()
         self.t  = getTime()
 
@@ -162,7 +231,8 @@ class AndroidOpenCV_OpticalAvoider(CustomCameraOpenCV,FloatLayout):
     def ShowTimeText(self):
         TimeLabelText = "T: "+str(round(self.DT,1))+" s"+" | "+str(round(self.freq,1))+" Hz"
         if self.dt_analysis!=0:
-            TimeLabelText+="\n"+"AnalysisTime: "+str(round(self.dt_analysis*1000,1))+"ms"
+            if self.orientation=="portrait": TimeLabelText+="\n"
+            TimeLabelText+="AnalysisTime: "+str(round(self.dt_analysis*1000,1))+"ms"
             TimeLabelText+="|"+str(round(1./self.dt_analysis,1))+"Hz"
 
         self.Labels["Time"].text = TimeLabelText
@@ -172,6 +242,8 @@ class AndroidOpenCV_OpticalAvoider(CustomCameraOpenCV,FloatLayout):
     #========================================================================================
 
     def AnalyzeFrame(self,frame,Profile=False):#True):
+
+        #print "orientation",self.orientation
 
         if Profile:
             if ProfilerImported:
@@ -216,9 +288,14 @@ class AndroidOpenCV_OpticalAvoider(CustomCameraOpenCV,FloatLayout):
 
         self.Labels["Flow"].text = "Optical Flow Data: "
 
-        flows  = [OFA.flow,OFA.flow_corrected]
-        flows.append(flows[1]-flows[0])
-        titles = ["Original","Corrected","Dif"]
+        flows  = [OFA.flow]
+        titles = ["Original"]
+
+        if self.OpticalAvoider.BooleanSettings["DeRotateFlow"]:
+            flows.append(OFA.flow_corrected)
+            flows.append(flows[1]-flows[0])
+            titles += ["Corrected","Dif"]
+
         for i in range(len(flows)):
             flow  = flows[i]
             title = titles[i]
@@ -231,6 +308,14 @@ class AndroidOpenCV_OpticalAvoider(CustomCameraOpenCV,FloatLayout):
             self.Labels["Flow"].text+= "Mean="+str(round(Mean,2))
             self.Labels["Flow"].text+= ","+"Min=" +str(round(Min ,2))
             self.Labels["Flow"].text+= ","+"Max=" +str(round(Max ,2))
+
+
+        if 0:#1:
+            self.Labels["Control"].text = "Control Data: "
+            if hasattr(self.OpticalAvoider,"OptColumn"):
+                self.Labels["Control"].text+= "Column="+str(self.OpticalAvoider.OptColumn)
+                self.Labels["Control"].text+= ","
+                self.Labels["Control"].text+= "Row="+str(self.OpticalAvoider.OptRow)
 
     #========================================================================================
     # IMU Data
@@ -256,13 +341,13 @@ class AndroidOpenCV_OpticalAvoider(CustomCameraOpenCV,FloatLayout):
 
         if UseAccelerometer:
             self.Labels["Accelerometer"].text = "Acceleration: "+str(np.round(self.acc,3))
-            self.Labels["Accelerometer"].text+= "\n"#" "
+            if self.orientation=="portrait": self.Labels["Accelerometer"].text+= "\n"#" "
             self.Labels["Accelerometer"].text+= "(Total: "+str(round(self.acc_Total,3))+")"
             self.Labels["Accelerometer"].text+= " [m/s²]"
 
         if UseGyroscope:
             self.Labels["Gyroscope"].text = "Rotational Velocity: "+str(np.round(self.rps,3))
-            self.Labels["Gyroscope"].text+= "\n"#" "
+            if self.orientation=="portrait": self.Labels["Gyroscope"].text+= "\n"#" "
             self.Labels["Gyroscope"].text+= "(Total: "+str(round(self.rps_Total,3))+")"
             self.Labels["Gyroscope"].text+= " [deg/s]"
 
@@ -291,7 +376,7 @@ class OpticalAvoiderApp(App):
     def build(self):
         print "Starting Build!"
 
-        Resolution = (320,240)#(160,120)#(320,240)#(1280,720)#(640,480)
+        Resolution = (320,240)#(640,480)#(480,640)#(640,480)#(240,320) # (320,240)#(160,120)#(320,240)#(1280,720)#(640,480)
 
         return AndroidOpenCV_OpticalAvoider(size=Resolution,resolution=Resolution,play=True) #CameraAnalyzer_Android()
 

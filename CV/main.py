@@ -22,14 +22,14 @@ import traceback,sys
 #+++++++++++++++++++++++++++++++++++++++++++
 
 print "Started Importing OpticalAvoiderApp..."
-#try:
-from OpticalAvoiderApp import OpticalAvoiderApp
-#except:
-#    print "Import Failed"
-#    print '-'*60
-#    traceback.print_exc(file=sys.stdout)
-#    print '-'*60 
-#    quit()  
+try:
+    from OpticalAvoiderApp import OpticalAvoiderApp
+except:
+    print "Import Failed"
+    print '-'*60
+    traceback.print_exc(file=sys.stdout)
+    print '-'*60 
+    quit()  
 
 #****************************************************************************************
 # Test Code

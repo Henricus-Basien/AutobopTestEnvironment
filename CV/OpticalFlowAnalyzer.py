@@ -91,6 +91,9 @@ class OpticalFlowAnalyzer():
         # Create some random colors
         self.colors = np.random.randint(0,255,(100,3))
 
+
+        self.DerotationScale = 1.0
+
     #+++++++++++++++++++++++++++++++++++++++++++
     # Optical Flow #1
     #+++++++++++++++++++++++++++++++++++++++++++
@@ -123,8 +126,6 @@ class OpticalFlowAnalyzer():
             poly_n     = 5
             poly_sigma = 1.2
 
-        
-
         #+++++++++++++++++++++++++++++++++++++++++++
 
         #--- Get Flow ---
@@ -156,6 +157,11 @@ class OpticalFlowAnalyzer():
             frame_new = cv2.resize(frame_new, res_new)
             frame_old = cv2.resize(frame_old, res_new)
 
+        if not np.all(frame_new.shape==frame_old.shape): #frame_new.shape is not frame_old.shape:
+            #print "Sizeing Mismatch detected!",frame_old.shape,frame_new.shape
+            frame_old = cv2.resize(frame_old,frame_new.shape[:2][::-1])
+            #print "Sizeing Mismatch detected and Corrected!",frame_old.shape,frame_new.shape
+
         #--- Convert Colorspace ---
         frame_new_g = cv2.cvtColor(frame_new,cv2.COLOR_BGR2GRAY)
         frame_old_g = cv2.cvtColor(frame_old,cv2.COLOR_BGR2GRAY)
@@ -174,7 +180,7 @@ class OpticalFlowAnalyzer():
             if Dir==1:
                 Sign*=-1
             #--- Augment Flow ---
-            Scale = 1 # Should be function of viewangle and image resolution!!!
+            Scale = self.DerotationScale # Should be function of viewangle and image resolution!!!
             flow[:,:,Dir]+=int(rps[i]*Scale*Sign)
         #flow-=20
         #ang+=90
@@ -254,7 +260,7 @@ class OpticalFlowAnalyzer():
 
         for y in range(res[0]):
             if Skip is not None and (y-y_offset)%Skip!=0:
-                continue
+                continue    
             for x in range(res[1]):
                 if Skip is not None and (x-x_offset)%Skip!=0:
                     continue

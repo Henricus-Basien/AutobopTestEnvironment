@@ -19,6 +19,8 @@ Description:
 # External
 #+++++++++++++++++++++++++++++++++++++++++++
 
+import time
+
 #-------------------------------------------
 # Kivy
 #-------------------------------------------
@@ -34,6 +36,8 @@ from kivy.graphics import Rectangle
 from kivy.clock import Clock
 from kivy.properties import BooleanProperty
 
+from kivy.core.window import Window
+
 #-------------------------------------------
 # Image Processing
 #-------------------------------------------
@@ -45,15 +49,31 @@ import imutils
 # Android Camera
 #****************************************************************************************
 
+class OrientationChecker(object):
+
+    def __init__(self,*args,**kwargs):
+
+        self.CheckOrientation()
+
+        Window.bind(size=self.CheckOrientation)
+
+    def CheckOrientation(self,*args,**kwargs):
+        if Window.size[0]>Window.size[1]:
+            self.orientation = "landscape"
+        else:
+            self.orientation = "portrait"
+        #print "orientation",self.orientation
+
 class CustomCameraAndroid(CameraAndroid):
 
     def _update(self, dt):
+
         self._surface_texture.updateTexImage()
         self._refresh_fbo()
         if self._texture is None:
             self._texture = self._fbo.texture
             self.dispatch('on_load')
-        self._copy_to_gpu()
+        self._copy_to_gpu()    
 
 class CustomCamera(Camera):
     
@@ -74,7 +94,7 @@ class CustomCamera(Camera):
 # Custom Camera OpenCV
 #****************************************************************************************
 
-class CustomCameraOpenCV(Image):
+class CustomCameraOpenCV(Image,OrientationChecker):
 
     allow_stretch = BooleanProperty(True)
 
@@ -90,6 +110,20 @@ class CustomCameraOpenCV(Image):
 
         super(CustomCameraOpenCV, self).__init__(*args,**kwargs)
         
+        self.InitCapture()
+
+        Clock.schedule_interval(self.update, 1.0 / fps)
+
+    def InitCapture(self):
+
+        #print "Initialized Camera!"*10
+
+        if hasattr(self,"capture"):
+            print "Removed Original Capture..."
+            self.capture._release_camera()
+            del self.capture
+            time.sleep(1)
+
         self.capture = CoreCamera(index=self.index,resolution=self.resolution, stopped=True)
 
         #self.capture.bind(on_load=self.capture_loaded)
@@ -98,13 +132,14 @@ class CustomCameraOpenCV(Image):
             self.capture.start()
             #self.capture.bind(on_texture=self.on_tex)
 
-        Clock.schedule_interval(self.update, 1.0 / fps)
-
     #========================================================================================
     # Update
     #========================================================================================
 
     def update(self, dt=0):
+
+        if 0:#1: #if self.orientation=="portrait":
+            self.FlipOrientation()
 
         #frame = self.capture.read_frame()
         try:
@@ -141,6 +176,12 @@ class CustomCameraOpenCV(Image):
             
             self.ShowTexture(texture)
 
+    def FlipOrientation(self):
+
+        #self.capture.resolution = self.capture.resolution[::-1]
+        self.resolution = self.resolution[::-1]
+        self.InitCapture()
+
     #========================================================================================
     # Basic Frame Preparation & Texture Handling
     #========================================================================================
@@ -150,7 +191,8 @@ class CustomCameraOpenCV(Image):
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         #--- Rotate Image by 90 degrees! ---
-        frame = imutils.rotate_bound(frame, 90)#angle)
+        if self.orientation=="portrait":
+            frame = imutils.rotate_bound(frame, 90)#angle)
 
         #--- Flip Image Horizontally ---
         frame = cv2.flip(frame, 0)
